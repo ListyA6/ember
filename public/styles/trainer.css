@@ -1,0 +1,77 @@
+/* ============================================================
+   EMBER · Trainer — coach roster + client drill-down.
+   Only genuinely-new classes live here; everything else reuses
+   components.css / base.css. NO backdrop-filter on cards: the
+   animated blurred background already sits behind the surface,
+   and per-card re-blur tanks the GPU (project performance lesson).
+   ============================================================ */
+
+/* A whole client card is a button — give it the same press feel the
+   rest of the app's tappable surfaces have, without adding blur. */
+.client-card {
+  transition: transform var(--d-fast) var(--e-spring),
+              box-shadow var(--d) var(--e-out),
+              border-color var(--d-fast);
+}
+.client-card:active {
+  transform: scale(0.985);
+  box-shadow: var(--sh-1);
+}
+.client-card:focus-visible {
+  outline: 0;
+  border-color: rgba(255, 106, 19, 0.45);
+  box-shadow: 0 0 0 4px rgba(255, 106, 19, 0.14);
+}
+
+/* Live status dot — green = active, coral = needs attention.
+   Plain solid fill + soft ring; no animation by default so a long
+   roster stays cheap to paint. */
+.status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
+.status-dot.ok    { background: var(--good);  box-shadow: 0 0 0 3px rgba(27, 191, 116, 0.16); }
+.status-dot.alert { background: var(--coral); box-shadow: 0 0 0 3px rgba(255, 77, 94, 0.16); }
+
+/* Mini 7-day activity bars shown on each roster card. */
+.mini-week {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 26px;
+}
+.mini-week .col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  border-radius: 4px;
+  background: var(--line);
+  overflow: hidden;
+}
+.mini-week .col > i {
+  display: block;
+  width: 100%;
+  border-radius: 4px;
+  background: linear-gradient(180deg, rgba(255, 142, 32, 0.72), rgba(255, 106, 19, 0.4));
+  animation: barRise 0.6s var(--e-out) both;
+}
+.mini-week .col.today > i { background: var(--grad-flame); }
+
+/* Coral "needs attention" pill — a warm-alert variant of .pill that
+   stays consistent across the roster card and the detail header. */
+.pill.alert {
+  background: rgba(255, 77, 94, 0.12);
+  border-color: rgba(255, 77, 94, 0.25);
+  color: var(--coral);
+}
+
+/* Program-picker rows inside the assign sheet read as selectable cards. */
+.prog-pick {
+  transition: border-color var(--d-fast), transform var(--d-fast) var(--e-spring);
+}
+.prog-pick:active { transform: scale(0.98); }
+.prog-pick.selected { border-color: rgba(255, 106, 19, 0.45); }

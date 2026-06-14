@@ -1,0 +1,134 @@
+/* ============================================================
+   EMBER · Design Tokens
+   White + orange, energetic, futuristic, glassmorphism.
+   Single source of truth for color, glass, motion, type, space.
+   ============================================================ */
+
+:root {
+  /* ---- Surface / background ---- */
+  --bg:            #f6f4f1;   /* warm near-white canvas */
+  --bg-tint:       #fff7ef;   /* warmer wash near top */
+  --ink:           #1c160f;   /* warm near-black text */
+  --ink-soft:      #4a4239;
+  --muted:         #837a6e;
+  --dim:           #aaa295;
+  --line:          rgba(28, 22, 15, 0.08);
+  --line-strong:   rgba(28, 22, 15, 0.14);
+
+  /* ---- Brand: the ember spectrum ---- */
+  --flame:         #ff6a13;   /* primary orange */
+  --flame-deep:    #f4490b;   /* pressed / deep */
+  --amber:         #ff9e2c;   /* secondary */
+  --gold:          #ffc14d;   /* highlight */
+  --coral:         #ff4d5e;   /* hot / PR / alert */
+  --on-flame:      #fff7f0;   /* text on flame */
+
+  /* Signature gradients */
+  --grad-flame:    linear-gradient(135deg, #ff8a1e 0%, #ff6a13 45%, #ff3d54 100%);
+  --grad-flame-soft: linear-gradient(135deg, #ffb24d 0%, #ff7a2e 100%);
+  --grad-gold:     linear-gradient(135deg, #ffd25e 0%, #ff9e2c 100%);
+  --grad-ink:      linear-gradient(135deg, #2a2118 0%, #1c160f 100%);
+
+  /* ---- Semantic ---- */
+  --good:          #1bbf74;
+  --good-soft:     rgba(27, 191, 116, 0.14);
+  --warn:          #ffab2e;
+  --bad:           #ff4d5e;
+  --info:          #2f8bff;
+
+  /* ---- Glass system ---- */
+  --glass-fill:    rgba(255, 255, 255, 0.58);
+  --glass-fill-2:  rgba(255, 255, 255, 0.42);  /* deeper / nested */
+  --glass-strong:  rgba(255, 255, 255, 0.78);  /* sheets, nav */
+  --glass-border:  rgba(255, 255, 255, 0.65);
+  --glass-edge:    rgba(255, 255, 255, 0.9);    /* top hairline highlight */
+  --glass-blur:    18px;
+  --glass-blur-lg: 30px;
+  --glass-tint:    rgba(255, 138, 30, 0.05);   /* faint warm cast inside glass */
+
+  /* ---- Elevation (warm-tinted shadows) ---- */
+  --sh-1: 0 1px 2px rgba(60, 30, 0, 0.05), 0 2px 8px rgba(60, 30, 0, 0.04);
+  --sh-2: 0 4px 14px rgba(70, 35, 0, 0.08), 0 1px 3px rgba(70, 35, 0, 0.06);
+  --sh-3: 0 12px 34px rgba(80, 40, 0, 0.13), 0 4px 10px rgba(80, 40, 0, 0.07);
+  --sh-flame: 0 8px 24px rgba(255, 106, 19, 0.34);
+  --sh-flame-lg: 0 14px 40px rgba(255, 106, 19, 0.42);
+
+  /* ---- Radii ---- */
+  --r-xs: 8px;
+  --r-sm: 12px;
+  --r:    18px;
+  --r-lg: 24px;
+  --r-xl: 30px;
+  --r-pill: 999px;
+
+  /* ---- Spacing scale ---- */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 32px;
+  --s-8: 44px;
+
+  /* ---- Type ----
+     Body/UI = Plus Jakarta Sans · Display + numerals = Space Grotesk.
+     Weights are the real static weights we ship (no synthetic faking). */
+  --font:         "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Plus Jakarta Sans", system-ui, sans-serif;
+  --num:          "Space Grotesk", "Plus Jakarta Sans", system-ui, sans-serif;
+  --t-2xl: clamp(28px, 7vw, 34px);
+  --t-xl:  24px;
+  --t-lg:  19px;
+  --t-md:  15px;
+  --t-sm:  13px;
+  --t-xs:  11px;
+  --w-bold: 700;
+  --w-semi: 600;
+  --w-med:  500;
+  /* wordmark / display letter-spacing — Space Grotesk needs far less negative tracking than Inter */
+  --ls-display: -0.02em;
+  --ls-wordmark: 0.18em;
+
+  /* ---- Motion ---- */
+  --e-out:    cubic-bezier(0.22, 1, 0.36, 1);     /* decel, default */
+  --e-spring: cubic-bezier(0.34, 1.56, 0.64, 1);  /* overshoot pop */
+  --e-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --d-fast: 0.16s;
+  --d:      0.28s;
+  --d-slow: 0.5s;
+
+  /* ---- Layout ---- */
+  --app-max: 540px;
+  --nav-h: 68px;
+  --header-h: 56px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+}
+
+/* Higher-contrast / "punchier" accent variant, toggled in Settings */
+:root[data-accent="vivid"] {
+  --flame: #ff5a00;
+  --grad-flame: linear-gradient(135deg, #ff9d1e 0%, #ff5a00 40%, #ff1f48 100%);
+  --sh-flame: 0 8px 26px rgba(255, 90, 0, 0.42);
+}
+
+/* Optional warm dark mode (honored if user sets it; default stays light) */
+:root[data-theme="dark"] {
+  --bg:        #14110d;
+  --bg-tint:   #1c1711;
+  --ink:       #f7f1e9;
+  --ink-soft:  #d8cfc2;
+  --muted:     #9b9384;
+  --dim:       #6f685c;
+  --line:      rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --glass-fill:   rgba(40, 33, 25, 0.55);
+  --glass-fill-2: rgba(40, 33, 25, 0.4);
+  --glass-strong: rgba(34, 28, 21, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-edge:   rgba(255, 255, 255, 0.18);
+  --glass-tint:   rgba(255, 138, 30, 0.06);
+  --sh-1: 0 1px 2px rgba(0,0,0,0.3);
+  --sh-2: 0 4px 14px rgba(0,0,0,0.4);
+  --sh-3: 0 12px 34px rgba(0,0,0,0.5);
+}

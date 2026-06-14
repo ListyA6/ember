@@ -1,0 +1,205 @@
+/* ============================================================
+   EMBER · Base — reset, layout shell, background, nav, type
+   ============================================================ */
+
+*, *::before, *::after { box-sizing: border-box; }
+* { -webkit-tap-highlight-color: transparent; }
+
+html, body {
+  margin: 0; padding: 0;
+  height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: var(--t-md);
+  line-height: 1.45;
+  font-weight: var(--w-med);
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior-y: none;
+}
+
+h1, h2, h3, h4 { margin: 0; font-family: var(--font-display); font-weight: var(--w-bold); letter-spacing: var(--ls-display); line-height: 1.05; }
+p { margin: 0; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { background: none; border: 0; cursor: pointer; padding: 0; }
+a { color: inherit; text-decoration: none; }
+ul { margin: 0; padding: 0; list-style: none; }
+img { display: block; max-width: 100%; }
+
+/* numerals carry the brand: Space Grotesk tabular figures everywhere */
+.tnum { font-family: var(--num); font-variant-numeric: tabular-nums; font-feature-settings: "tnum" 1; letter-spacing: 0; }
+
+/* ---------- Animated ember background ---------- */
+.bg {
+  position: fixed; inset: 0; z-index: -2;
+  background: var(--bg);
+  overflow: hidden;
+}
+.bg::after { /* fine grain to keep glass from looking flat */
+  content: ""; position: absolute; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.4'/%3E%3C/svg%3E");
+  opacity: 0.035; pointer-events: none;
+}
+/* Blobs are pre-faded radial gradients, NOT filter: blur() — a live 60px
+   blur forced the GPU to re-composite the layer on every frame of the
+   drift. The gradient fade reads the same and rasterizes once. */
+.blob {
+  position: absolute; opacity: 0.55;
+  will-change: transform;
+}
+.blob.b1 { width: 62vw; height: 62vw; max-width: 470px; max-height: 470px;
+  background:
+    radial-gradient(38% 38% at 32% 32%, rgba(255,196,110,0.9), rgba(255,178,77,0) 100%),
+    radial-gradient(50% 50% at 50% 50%, #ff7a1a 0%, rgba(255,106,19,0.78) 45%, rgba(255,106,19,0.3) 70%, rgba(255,106,19,0) 95%);
+  top: -11%; left: -15%; animation: drift1 22s var(--e-in-out) infinite; }
+.blob.b2 { width: 56vw; height: 56vw; max-width: 430px; max-height: 430px;
+  background:
+    radial-gradient(40% 40% at 58% 40%, rgba(255,160,172,0.9), rgba(255,122,138,0) 100%),
+    radial-gradient(50% 50% at 50% 50%, #ff5468 0%, rgba(255,61,84,0.75) 48%, rgba(255,61,84,0.28) 72%, rgba(255,61,84,0) 96%);
+  top: 16%; right: -21%; opacity: 0.4; animation: drift2 26s var(--e-in-out) infinite; }
+.blob.b3 { width: 66vw; height: 66vw; max-width: 510px; max-height: 510px;
+  background:
+    radial-gradient(42% 42% at 50% 46%, rgba(255,224,130,0.95), rgba(255,210,94,0) 100%),
+    radial-gradient(50% 50% at 50% 50%, #ffc14d 0%, rgba(255,158,44,0.78) 46%, rgba(255,158,44,0.3) 72%, rgba(255,158,44,0) 96%);
+  bottom: -19%; left: 5%; opacity: 0.42; animation: drift3 30s var(--e-in-out) infinite; }
+
+@keyframes drift1 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(8%,6%) scale(1.08)} }
+@keyframes drift2 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-6%,10%) scale(1.12)} }
+@keyframes drift3 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(5%,-8%) scale(1.06)} }
+
+/* ---------- App shell ---------- */
+.app {
+  position: relative;
+  width: 100%; max-width: var(--app-max);
+  margin: 0 auto;
+  min-height: 100%;
+  padding: 0 var(--s-4);
+  padding-bottom: calc(var(--nav-h) + var(--safe-b) + var(--s-6));
+}
+
+/* ---------- Top bar ---------- */
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: var(--s-3);
+  height: var(--header-h);
+  margin: 0 calc(-1 * var(--s-4)) var(--s-2);
+  padding: 0 var(--s-4);
+  background: linear-gradient(180deg, var(--bg) 30%, transparent);
+}
+.topbar .brand { display: flex; align-items: center; gap: var(--s-2); }
+.topbar .brand .mark { width: 26px; height: 26px; }
+.topbar .brand .name {
+  font-family: var(--font-display);
+  font-size: 17px; font-weight: 600;
+  letter-spacing: var(--ls-wordmark); text-transform: uppercase;
+  padding-left: 1px;
+}
+.topbar .brand .name b { background: var(--grad-flame); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.topbar .actions { display: flex; align-items: center; gap: var(--s-2); }
+
+/* ---------- View outlet + transitions ---------- */
+#view { display: block; min-height: 60vh; }
+.view-enter { animation: viewIn var(--d) var(--e-out) both; }
+.view-leave { animation: viewOut 0.18s var(--e-in-out) both; }
+@keyframes viewIn  { from { opacity: 0; transform: translateY(10px) scale(0.995); } to { opacity: 1; transform: none; } }
+@keyframes viewOut { to   { opacity: 0; transform: translateY(-6px) scale(0.995); } }
+
+/* Stagger helper: children fade-rise in sequence.
+   Scoped to .view-enter so it only plays on navigation, not on
+   in-place store refreshes (which would re-flash the list). */
+.view-enter .stagger > * { animation: riseIn var(--d) var(--e-out) both; }
+.view-enter .stagger > *:nth-child(1){animation-delay:.02s}
+.view-enter .stagger > *:nth-child(2){animation-delay:.06s}
+.view-enter .stagger > *:nth-child(3){animation-delay:.10s}
+.view-enter .stagger > *:nth-child(4){animation-delay:.14s}
+.view-enter .stagger > *:nth-child(5){animation-delay:.18s}
+.view-enter .stagger > *:nth-child(6){animation-delay:.22s}
+.view-enter .stagger > *:nth-child(7){animation-delay:.26s}
+.view-enter .stagger > *:nth-child(8){animation-delay:.30s}
+@keyframes riseIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+/* ---------- Bottom navigation (glass) ---------- */
+.navbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+  display: flex; justify-content: center;
+  padding: 0 var(--s-4) calc(var(--s-3) + var(--safe-b));
+  pointer-events: none;
+}
+.nav {
+  pointer-events: auto;
+  display: flex; align-items: center; justify-content: space-around;
+  gap: var(--s-1);
+  width: 100%; max-width: calc(var(--app-max) - var(--s-4));
+  height: 60px; padding: 0 var(--s-2);
+  background: var(--glass-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--r-pill);
+  box-shadow: var(--sh-3);
+  -webkit-backdrop-filter: blur(var(--glass-blur-lg)) saturate(1.5);
+  backdrop-filter: blur(var(--glass-blur-lg)) saturate(1.5);
+}
+.nav button {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 3px; flex: 1; height: 48px; border-radius: var(--r-pill);
+  color: var(--muted);
+  transition: color var(--d-fast) var(--e-out), transform var(--d-fast) var(--e-out);
+}
+.nav button .ic { width: 23px; height: 23px; }
+.nav button .lbl { font-size: 10px; font-weight: var(--w-semi); letter-spacing: 0.01em; }
+.nav button:active { transform: scale(0.9); }
+.nav button.active { color: var(--flame); }
+.nav button.active .ic { filter: drop-shadow(0 3px 8px rgba(255,106,19,0.45)); }
+
+/* center FAB-style add button */
+.nav .fab {
+  flex: 0 0 auto; width: 52px; height: 52px; border-radius: 50%;
+  background: var(--grad-flame); color: var(--on-flame);
+  box-shadow: var(--sh-flame);
+  margin: 0 2px;
+  transition: transform var(--d-fast) var(--e-spring), box-shadow var(--d) var(--e-out);
+}
+.nav .fab .ic { width: 26px; height: 26px; }
+.nav .fab .lbl { display: none; }
+.nav .fab:active { transform: scale(0.88); }
+.nav .fab.active { color: var(--on-flame); }
+
+/* ---------- Utility ---------- */
+.row { display: flex; align-items: center; gap: var(--s-2); }
+.col { display: flex; flex-direction: column; }
+.between { display: flex; align-items: center; justify-content: space-between; gap: var(--s-2); }
+.wrap { flex-wrap: wrap; }
+.grow { flex: 1; }
+.center { display: flex; align-items: center; justify-content: center; }
+.gap-1{gap:var(--s-1)} .gap-2{gap:var(--s-2)} .gap-3{gap:var(--s-3)} .gap-4{gap:var(--s-4)}
+.mt-1{margin-top:var(--s-1)} .mt-2{margin-top:var(--s-2)} .mt-3{margin-top:var(--s-3)} .mt-4{margin-top:var(--s-4)} .mt-5{margin-top:var(--s-5)} .mt-6{margin-top:var(--s-6)}
+.mb-2{margin-bottom:var(--s-2)} .mb-3{margin-bottom:var(--s-3)} .mb-4{margin-bottom:var(--s-4)}
+.hide { display: none !important; }
+.muted { color: var(--muted); }
+.dim { color: var(--dim); }
+.flame { color: var(--flame); }
+.good { color: var(--good); }
+.bad { color: var(--bad); }
+.t-xs{font-size:var(--t-xs)} .t-sm{font-size:var(--t-sm)} .t-lg{font-size:var(--t-lg)} .t-xl{font-size:var(--t-xl)}
+.semi{font-weight:var(--w-semi)} .bold{font-weight:var(--w-bold)}
+.upper { text-transform: uppercase; letter-spacing: 0.12em; font-size: var(--t-xs); font-weight: var(--w-semi); }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* page title block used at top of most views */
+.page-title { padding: var(--s-2) 0 var(--s-4); }
+.page-title h1 { font-size: var(--t-2xl); }
+.page-title .sub { color: var(--muted); font-size: var(--t-sm); margin-top: 4px; }
+
+/* scrollable horizontal rail */
+.rail { display: flex; gap: var(--s-3); overflow-x: auto; scroll-snap-type: x mandatory;
+  margin: 0 calc(-1 * var(--s-4)); padding: var(--s-1) var(--s-4) var(--s-3); -webkit-overflow-scrolling: touch; }
+.rail::-webkit-scrollbar { display: none; }
+.rail > * { scroll-snap-align: start; flex: 0 0 auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001s !important; animation-iteration-count: 1 !important; transition-duration: 0.001s !important; }
+  .blob { animation: none; }
+}
