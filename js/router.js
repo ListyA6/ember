@@ -71,6 +71,9 @@ window.App = window.App || {};
     // re-render current view without transition (used on store 'change')
     refresh() {
       const def = App.views[router.current]; if (!def) return;
+      // entry forms opt out of in-place refresh so a background sync (e.g. fetch-on-focus
+      // when returning from the camera) can't wipe in-progress input; cache still updates.
+      if (def.noRefresh) return;
       const root = App.ui.$('#view');
       const scrollY = window.scrollY;
       root.classList.remove('view-enter'); // suppress entrance stagger on data refresh

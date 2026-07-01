@@ -70,5 +70,5 @@
     root.appendChild(page);
   }
 
-  App.registerView('walk', { render, title: 'Walk' });
+  App.registerView('walk', { render, title: 'Walk', noRefresh: true });
 })(window.App);
