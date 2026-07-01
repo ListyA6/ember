@@ -1,6 +1,13 @@
 /* ============================================================
    Ember Pact — Walk logger. Enter step count + smartwatch photo.
    Auto-completes the day's walk requirement on save.
+
+   Draft persistence: on mobile, opening the camera (file input with
+   capture) can make the OS evict/reload the whole WebView to free
+   memory — which wipes the typed step count and the picked photo.
+   So we persist an in-progress draft (steps + photo) to localStorage
+   on every change and restore it on render. Survives reload, a
+   background refresh, and navigating away and back. Cleared on save.
    ============================================================ */
 (function (App) {
   'use strict';
@@ -14,15 +21,29 @@
     const row = sync.cachedDay(me, today) || {};
     const target = pact.walkTarget(row);
 
-    let photo = row.stepPhotoUrl || null;     // existing server URL or new dataURL
-    let photoIsNew = false;
+    const DRAFT_KEY = 'pact_walk_draft_' + me;
+    const loadDraft = () => { try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch (e) { return null; } };
+    const clearDraft = () => { try { localStorage.removeItem(DRAFT_KEY); } catch (e) {} };
+    const d = loadDraft();
+    const draft = (d && d.date === today) ? d : null;   // only today's draft applies
+
+    // restore photo/steps from draft, else from the saved server row
+    let photo = (draft && draft.photo) ? draft.photo : (row.stepPhotoUrl || null); // server URL or new dataURL
+    let photoIsNew = !!(draft && draft.photo);
+
+    const saveDraft = () => {
+      try { localStorage.setItem(DRAFT_KEY, JSON.stringify({ date: today, steps: stepInput.value, photo: photoIsNew ? photo : null })); }
+      catch (e) { /* quota / private mode — draft is best-effort */ }
+    };
 
     const page = el('div', { class: 'stagger' });
     page.appendChild(pageTitle('Log your walk', 'Target ' + target.toLocaleString('id-ID') + ' steps today'));
 
     // step count
+    const initialSteps = (draft && draft.steps) ? String(draft.steps) : (row.stepCount ? String(row.stepCount) : '');
     const stepInput = el('input', { class: 'input big tnum', id: 'walk-steps', type: 'number', inputmode: 'numeric',
-      step: '100', placeholder: String(target), value: row.stepCount ? String(row.stepCount) : '' });
+      step: '100', placeholder: String(target), value: initialSteps });
+    stepInput.addEventListener('input', saveDraft);   // persist as they type
     page.appendChild(el('div', { class: 'card' }, [
       el('div', { class: 'field', style: { marginBottom: '0' } }, [ el('label', { text: 'Step count' }), stepInput ])
     ]));
@@ -46,7 +67,9 @@
     }
     photoInput.addEventListener('change', async (e) => {
       const f = e.target.files && e.target.files[0]; if (!f) return;
-      photo = await ui.resizeImage(f, 1000); photoIsNew = true; haptic(); paintPhoto();
+      try {
+        photo = await ui.resizeImage(f, 1000); photoIsNew = true; haptic(); paintPhoto(); saveDraft();
+      } catch (err) { toast('Could not read that photo — try again'); }
     });
     paintPhoto();
     page.appendChild(el('div', { class: 'card flat mt-2' }, [photoLabel]));
@@ -61,6 +84,7 @@
         let url = photo;
         if (photoIsNew) url = await sync.upload(photo);
         await sync.putDay({ date: today, stepCount: steps, stepPhotoUrl: url });
+        clearDraft();
         toast('Walk logged', { type: 'good', icon: 'check' });
         router.go('/dashboard');
       } catch (err) { save.disabled = false; toast('Save failed: ' + err.message); }
