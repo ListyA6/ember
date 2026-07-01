@@ -1,6 +1,6 @@
 /* Ember Pact service worker — offline-first app shell cache.
    IMPORTANT: never cache api.php (the shared ledger must stay live). */
-const CACHE = 'pact-v1';
+const CACHE = 'pact-v2';
 const ASSETS = [
   './', './index.html', './manifest.webmanifest',
   './styles/fonts.css', './styles/tokens.css', './styles/base.css', './styles/components.css', './styles/animations.css',
