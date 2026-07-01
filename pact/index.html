@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Ember Pact — updating…</title>
+<style>html,body{height:100%;margin:0}body{display:flex;align-items:center;justify-content:center;font-family:system-ui,-apple-system,sans-serif;background:#f6f4f1;color:#14110d}</style>
+</head>
+<body>
+<p>Updating Ember Pact…</p>
+<script>
+/* The old /pact/ install is retired. Unregister its service worker, purge its
+   caches, then send this device to the working app at the site root. */
+(async () => {
+  try {
+    if ('serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map(function (r) { return r.unregister(); }));
+    }
+    if (self.caches) {
+      const ks = await caches.keys();
+      await Promise.all(ks.map(function (k) { return caches.delete(k); }));
+    }
+  } catch (e) {}
+  location.replace('/');
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+# /pact/ retired — everything moved to the site root. Self-heal old installs.
+RewriteEngine On
+# serve the real files that live here (api.php proxy, index.html, sw.js) untouched
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+# any other path under /pact/ -> the self-heal page, which redirects to root
+RewriteRule ^ index.html [L]
