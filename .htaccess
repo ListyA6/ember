@@ -1,0 +1,21 @@
+<IfModule mod_rewrite.c>
+    Options -MultiViews -Indexes
+    RewriteEngine On
+
+    # Pass the Authorization header through to PHP (needed for the API Bearer token)
+    RewriteCond %{HTTP:Authorization} .
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+    # Serve real files/dirs directly; otherwise fall back to the PWA shell.
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.html [L]
+</IfModule>
+
+# Never expose secrets / config
+<Files "config.php">
+    Require all denied
+</Files>
+<Files "config.sample.php">
+    Require all denied
+</Files>
