@@ -53,6 +53,11 @@ switch ("{$_SERVER['REQUEST_METHOD']}:$action") {
   case 'POST:settle':     settle($pdo); break;
   case 'GET:settlements': settlements($pdo); break;
   case 'POST:upload':     upload(); break;
+  case 'GET:vapidkey':    ok(['key' => vapidKeys($pdo)['pub'] ?? null]); break;
+  case 'POST:subscribe':  subscribe($pdo); break;
+  case 'POST:unsubscribe': unsubscribe($pdo); break;
+  case 'GET:notifications':
+  case 'POST:notifications': notifications($pdo); break;
   default: fail(404, 'unknown_action');
 }
 
@@ -72,6 +77,107 @@ function ensureTables(PDO $p): void {
     id INT NOT NULL AUTO_INCREMENT, month CHAR(7) NOT NULL, net_to_me INT NOT NULL,
     note VARCHAR(255) DEFAULT NULL, created_at BIGINT NOT NULL,
     PRIMARY KEY (id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  // key/value store (VAPID keypair lives here; private key never leaves the server)
+  $p->exec("CREATE TABLE IF NOT EXISTS pact_meta (
+    k VARCHAR(32) NOT NULL, v TEXT NOT NULL, PRIMARY KEY (k)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  // one row per installed device (Web Push subscription), tagged with its user
+  $p->exec("CREATE TABLE IF NOT EXISTS pact_push_subs (
+    id INT NOT NULL AUTO_INCREMENT, user VARCHAR(16) NOT NULL,
+    endpoint VARCHAR(512) NOT NULL, p256dh VARCHAR(128) NOT NULL, auth VARCHAR(64) NOT NULL,
+    ua VARCHAR(255) DEFAULT NULL, created_at BIGINT NOT NULL,
+    PRIMARY KEY (id), UNIQUE KEY uniq_endpoint (endpoint(191))) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+  // partner-activity feed; each notable transition writes a row for the OTHER user
+  $p->exec("CREATE TABLE IF NOT EXISTS pact_events (
+    id INT NOT NULL AUTO_INCREMENT, recipient VARCHAR(16) NOT NULL, actor VARCHAR(16) NOT NULL,
+    type VARCHAR(24) NOT NULL, text VARCHAR(160) NOT NULL, date CHAR(10) NOT NULL,
+    seen TINYINT(1) NOT NULL DEFAULT 0, created_at BIGINT NOT NULL,
+    PRIMARY KEY (id), KEY recipient_seen (recipient, seen)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+}
+
+// ============================================================
+//  Web Push (no-payload). Pure-PHP VAPID (ES256), OpenSSL only.
+// ============================================================
+function b64u(string $s): string { return rtrim(strtr(base64_encode($s), '+/', '-_'), '='); }
+function displayName(string $u): string { return $u === 'gf' ? 'Yeti' : 'Listy'; }
+function otherUser(string $u): string { return $u === 'gf' ? 'me' : 'gf'; }
+
+// generate the VAPID keypair once and persist it; returns ['priv'=>PEM, 'pub'=>base64url point]
+function vapidKeys(PDO $p): array {
+  $r = $p->query("SELECT v FROM pact_meta WHERE k='vapid'")->fetch();
+  if ($r) { $j = json_decode($r['v'], true); if (isset($j['priv'], $j['pub'])) return $j; }
+  $k = @openssl_pkey_new(['curve_name' => 'prime256v1', 'private_key_type' => OPENSSL_KEYTYPE_EC]);
+  if (!$k) return [];
+  openssl_pkey_export($k, $priv);
+  $d = openssl_pkey_get_details($k);
+  $pub = "\x04" . str_pad($d['ec']['x'], 32, "\x00", STR_PAD_LEFT) . str_pad($d['ec']['y'], 32, "\x00", STR_PAD_LEFT);
+  $j = ['priv' => $priv, 'pub' => b64u($pub)];
+  $p->prepare("INSERT INTO pact_meta(k,v) VALUES('vapid',:v) ON DUPLICATE KEY UPDATE v=VALUES(v)")->execute([':v' => json_encode($j)]);
+  return $j;
+}
+
+// convert an ECDSA DER signature to JOSE raw r||s (2 x 32 bytes)
+function derToRaw(string $der): string {
+  $o = 0; $len = strlen($der);
+  if ($o >= $len || ord($der[$o++]) !== 0x30) return '';
+  $b = ord($der[$o++]); if ($b & 0x80) { $o += ($b & 0x7f); }         // skip seq length
+  $read = function () use ($der, &$o, $len) {
+    if ($o >= $len || ord($der[$o++]) !== 0x02) return '';
+    $l = ord($der[$o++]); $v = substr($der, $o, $l); $o += $l;
+    return ltrim($v, "\x00");
+  };
+  $r = $read(); $s = $read();
+  if ($r === '' || $s === '') return '';
+  return str_pad($r, 32, "\x00", STR_PAD_LEFT) . str_pad($s, 32, "\x00", STR_PAD_LEFT);
+}
+
+function vapidJwt(string $aud, string $privPem, string $sub): string {
+  $head = b64u(json_encode(['typ' => 'JWT', 'alg' => 'ES256']));
+  $body = b64u(json_encode(['aud' => $aud, 'exp' => time() + 43200, 'sub' => $sub]));
+  $signing = $head . '.' . $body;
+  if (!openssl_sign($signing, $der, $privPem, OPENSSL_ALGO_SHA256)) return '';
+  return $signing . '.' . b64u(derToRaw($der));
+}
+
+// fire a no-payload push to every device of $recipient; prune dead subscriptions
+function sendPush(PDO $p, string $recipient): void {
+  $subs = $p->prepare("SELECT * FROM pact_push_subs WHERE user=:u"); $subs->execute([':u' => $recipient]);
+  $rows = $subs->fetchAll(); if (!$rows) return;
+  $v = vapidKeys($p); if (!$v || !function_exists('curl_init')) return;
+  foreach ($rows as $sub) {
+    $ep = $sub['endpoint'];
+    $aud = parse_url($ep, PHP_URL_SCHEME) . '://' . parse_url($ep, PHP_URL_HOST);
+    $jwt = vapidJwt($aud, $v['priv'], 'mailto:zhugelisty@gmail.com'); if (!$jwt) return;
+    $ch = curl_init($ep);
+    curl_setopt_array($ch, [
+      CURLOPT_POST => true, CURLOPT_POSTFIELDS => '', CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10,
+      CURLOPT_HTTPHEADER => ['TTL: 86400', 'Content-Length: 0', 'Urgency: normal', 'Authorization: vapid t=' . $jwt . ', k=' . $v['pub']],
+    ]);
+    curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    if ($code === 404 || $code === 410) $p->prepare("DELETE FROM pact_push_subs WHERE id=:id")->execute([':id' => $sub['id']]);
+  }
+}
+
+function walkOk(array $d): bool {
+  $need = !empty($d['swap_used']) ? 14000 : 7000;
+  return ((int)($d['step_count'] ?? 0)) >= $need;
+}
+
+// compare prev vs new day row for $actor; record partner events + one push on notable 0->1 transitions
+function notifyTransitions(PDO $p, string $actor, string $date, array $prev, array $new, int $prevComplete, int $newComplete): void {
+  try {
+    $rcpt = otherUser($actor); $name = displayName($actor); $ts = (int) round(microtime(true) * 1000);
+    $events = [];
+    if (!empty($new['workout_done']) && empty($prev['workout_done']))
+      $events[] = ['workout', $name . ' finished a workout · your move 👊'];
+    if (walkOk($new) && !walkOk($prev))
+      $events[] = ['walk', $name . ' logged their walk (' . number_format((int)$new['step_count']) . ' steps)'];
+    if ($newComplete === 1 && $prevComplete === 0)
+      $events[] = ['day_complete', $name . ' completed the day ✅'];
+    if (!$events) return;
+    $ins = $p->prepare("INSERT INTO pact_events(recipient,actor,type,text,date,created_at) VALUES(:r,:a,:ty,:tx,:d,:t)");
+    foreach ($events as $e) $ins->execute([':r' => $rcpt, ':a' => $actor, ':ty' => $e[0], ':tx' => $e[1], ':d' => $date, ':t' => $ts]);
+    sendPush($p, $rcpt);
+  } catch (Throwable $e) { /* never let notifications break a save */ }
 }
 
 // --- per-user private blob ---
@@ -129,6 +235,8 @@ function putDay(PDO $p): void {
       complete=VALUES(complete),updated_at=VALUES(updated_at)")
    ->execute([':u' => $u, ':date' => $date, ':iwd' => $d['is_workout_day'], ':swap' => $d['swap_used'], ':sc' => $d['step_count'],
      ':sp' => $d['step_photo_url'], ':wd' => $d['workout_done'], ':wp' => $d['workout_photo_url'], ':c' => $complete, ':t' => $ts]);
+  // notify the partner on notable transitions (workout done / walk hit / day complete)
+  notifyTransitions($p, $u, $date, $row, $d, (int)($row['complete'] ?? 0), $complete);
   ok(['day' => ['user' => $u, 'date' => $date, 'complete' => $complete] + $d + ['updated_at' => $ts]]);
 }
 function settle(PDO $p): void {
@@ -139,6 +247,42 @@ function settle(PDO $p): void {
 }
 function settlements(PDO $p): void {
   ok(['settlements' => $p->query("SELECT * FROM pact_settlements ORDER BY month DESC")->fetchAll()]);
+}
+
+// --- push subscriptions + notification feed ---
+function subscribe(PDO $p): void {
+  $b = body(); $u = bodyUser($b);
+  $sub  = is_array($b['subscription'] ?? null) ? $b['subscription'] : [];
+  $ep   = (string)($sub['endpoint'] ?? '');
+  $keys = is_array($sub['keys'] ?? null) ? $sub['keys'] : [];
+  $p256 = (string)($keys['p256dh'] ?? ''); $auth = (string)($keys['auth'] ?? '');
+  if ($ep === '' || $p256 === '' || $auth === '') fail(400, 'bad_subscription');
+  $ua = substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255);
+  $p->prepare("INSERT INTO pact_push_subs(user,endpoint,p256dh,auth,ua,created_at) VALUES(:u,:e,:p,:a,:ua,:t)
+    ON DUPLICATE KEY UPDATE user=VALUES(user),p256dh=VALUES(p256dh),auth=VALUES(auth),ua=VALUES(ua)")
+   ->execute([':u' => $u, ':e' => substr($ep, 0, 512), ':p' => substr($p256, 0, 128), ':a' => substr($auth, 0, 64),
+     ':ua' => $ua, ':t' => (int) round(microtime(true) * 1000)]);
+  ok(['subscribed' => true, 'user' => $u]);
+}
+function unsubscribe(PDO $p): void {
+  $b = body(); $ep = (string)($b['endpoint'] ?? ''); if ($ep === '') fail(400, 'bad_endpoint');
+  $p->prepare("DELETE FROM pact_push_subs WHERE endpoint=:e")->execute([':e' => substr($ep, 0, 512)]);
+  ok(['unsubscribed' => true]);
+}
+// unseen partner events for a user. SW calls POST {endpoint} (resolves user); app calls GET ?user=.
+function notifications(PDO $p): void {
+  $b = $_SERVER['REQUEST_METHOD'] === 'POST' ? body() : [];
+  $user = null;
+  if (!empty($b['endpoint'])) {
+    $s = $p->prepare("SELECT user FROM pact_push_subs WHERE endpoint=:e LIMIT 1");
+    $s->execute([':e' => substr((string)$b['endpoint'], 0, 512)]); $r = $s->fetch(); $user = $r ? $r['user'] : null;
+  }
+  if (!$user) $user = userId();
+  $q = $p->prepare("SELECT id,actor,type,text,date,created_at FROM pact_events WHERE recipient=:u AND seen=0 ORDER BY id");
+  $q->execute([':u' => $user]); $events = $q->fetchAll();
+  $markSeen = !empty($_GET['markSeen']) || !empty($b['markSeen']);
+  if ($markSeen && $events) $p->prepare("UPDATE pact_events SET seen=1 WHERE recipient=:u AND seen=0")->execute([':u' => $user]);
+  ok(['user' => $user, 'events' => $events]);
 }
 
 // --- image upload ---

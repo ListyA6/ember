@@ -142,11 +142,68 @@
     ]);
   }
 
+  /* ---- app: install + partner notifications ---- */
+  function partnerName() { return store.currentUser() === 'gf' ? 'Listy' : 'Yeti'; }
+
+  function installControl() {
+    const pwa = App.pwa;
+    if (pwa && pwa.isStandalone && pwa.isStandalone()) {
+      return h('<span class="good" style="display:inline-flex;align-items:center;gap:6px">' + icon('checkCircle', 18) + '<span class="t-sm semi">Installed</span></span>');
+    }
+    const btn = el('button', { class: 'btn ghost', html: icon('download', 16) + '<span>Install</span>' });
+    btn.addEventListener('click', async () => {
+      haptic(8);
+      if (pwa && pwa.canPrompt && pwa.canPrompt()) { await pwa.promptInstall(); router.go('/settings'); return; }
+      if (pwa && pwa.isIOS && pwa.isIOS()) {
+        openSheet({ center: true, title: 'Add to Home Screen', hint: 'In Safari, tap the Share icon, then “Add to Home Screen”. Then open Ember Pact from your home screen.', actions: [{ label: 'Got it', class: 'flame' }] });
+        return;
+      }
+      openSheet({ center: true, title: 'Install Ember Pact', hint: 'Open your browser menu (⋮) and choose “Install app” or “Add to Home screen”.', actions: [{ label: 'Got it', class: 'flame' }] });
+    });
+    return btn;
+  }
+
+  function notifControl() {
+    const push = App.pactPush;
+    const btn = el('button', { class: 'btn ghost', html: '<span>…</span>' });
+    if (!push || !push.supported()) { btn.innerHTML = icon('info', 16) + '<span>Unsupported</span>'; btn.disabled = true; return btn; }
+    const setLabel = (on) => { btn.innerHTML = icon(on ? 'checkCircle' : 'bell', 16) + '<span>' + (on ? 'On' : 'Turn on') + '</span>'; };
+    push.isSubscribed().then(setLabel).catch(() => setLabel(false));
+    btn.addEventListener('click', async () => {
+      haptic(8);
+      let on = false; try { on = await push.isSubscribed(); } catch (e) {}
+      btn.disabled = true;
+      try {
+        if (on) { await push.disable(); setLabel(false); toast('Notifications off'); }
+        else if (App.pwa && App.pwa.isIOS() && !App.pwa.isStandalone()) {
+          openSheet({ center: true, title: 'Install first', hint: 'On iPhone, add Ember Pact to your Home Screen, open it from there, then turn on notifications.', actions: [{ label: 'OK', class: 'flame' }] });
+        } else {
+          await push.enable(store.currentUser() || 'me');
+          setLabel(true); toast('Notifications on', { type: 'good', icon: 'check' });
+        }
+      } catch (e) {
+        const m = e && e.message;
+        toast(m === 'denied' ? 'Blocked — allow notifications in your browser settings'
+          : m === 'unsupported' ? 'Not supported on this device' : 'Could not update notifications');
+      } finally { btn.disabled = false; }
+    });
+    return btn;
+  }
+
+  function appSection() {
+    return section('App', [
+      settingRow('Install app', 'Add Ember Pact to your home screen', installControl()),
+      el('div', { style: { borderTop: '1px solid var(--line)' } }),
+      settingRow('Notifications', 'When ' + partnerName() + ' logs a walk or workout', notifControl())
+    ]);
+  }
+
   function render(root) {
     const page = el('div', { class: 'stagger' });
     page.appendChild(pageTitle('Settings'));
     page.appendChild(profileCard());
     page.appendChild(pactSection());
+    page.appendChild(appSection());
     page.appendChild(preferences());
     page.appendChild(dataCard());
     page.appendChild(syncCard());

@@ -18,6 +18,24 @@ window.App = window.App || {};
   }
   App.applySettings = applySettings;
 
+  /* ---------------- PWA install ---------------- */
+  // stash the browser's install prompt so Settings can fire it on a user tap
+  window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); App.installPrompt = e; });
+  window.addEventListener('appinstalled', () => { App.installPrompt = null; });
+  App.pwa = {
+    isStandalone() {
+      try { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone === true; }
+      catch (e) { return false; }
+    },
+    isIOS() { return /iphone|ipad|ipod/i.test(navigator.userAgent || '') && !window.MSStream; },
+    canPrompt() { return !!App.installPrompt; },
+    async promptInstall() {
+      const p = App.installPrompt; if (!p) return { outcome: 'unavailable' };
+      p.prompt(); let choice; try { choice = await p.userChoice; } catch (e) { choice = { outcome: 'dismissed' }; }
+      App.installPrompt = null; return choice;
+    }
+  };
+
   /* ---------------- shared: log body weight ---------------- */
   function logWeight() {
     const last = store.latestWeight();
